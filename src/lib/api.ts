@@ -13,8 +13,8 @@ import type {
   AddressResponse, CreateAddressRequest, UpdateAddressRequest,
 } from '@/types/api';
 
-// Set to false to use real API
-const USE_MOCKS = true;
+// Usar API real do backend (definir VITE_USE_MOCKS=true para mocks em dev)
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 
 // In-memory mock state (supports add/delete during session)
 let mockAllergies = [...MOCK_ALLERGIES];
