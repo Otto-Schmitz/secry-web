@@ -15,6 +15,7 @@ import { AlertTriangle, Pill, Plus, Trash2, Pencil, HeartPulse } from 'lucide-re
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog';
 
 const BLOOD_TYPES: BloodType[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'UNKNOWN'];
 const SEVERITIES: { value: AllergySeverity; label: string }[] = [
@@ -98,16 +99,16 @@ export default function Health() {
   // Medication sheet (create + edit)
   const [medOpen, setMedOpen] = useState(false);
   const [editingMedId, setEditingMedId] = useState<string | null>(null);
-  const [medForm, setMedForm] = useState({ name: '', dosage: '', frequency: '', notes: '' });
+  const [medForm, setMedForm] = useState({ name: '', dosage: '', frequency: '', notes: '', active: true, startedAt: '', stoppedAt: '' });
 
   const medCreate = useMutation({
-    mutationFn: () => medicationApi.create({ name: medForm.name, dosage: medForm.dosage || undefined, frequency: medForm.frequency || undefined, notes: medForm.notes || undefined }),
+    mutationFn: () => medicationApi.create({ name: medForm.name, dosage: medForm.dosage || undefined, frequency: medForm.frequency || undefined, notes: medForm.notes || undefined, active: medForm.active, startedAt: medForm.startedAt || undefined, stoppedAt: medForm.stoppedAt || undefined }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['medications'] }); qc.invalidateQueries({ queryKey: ['health'] }); setMedOpen(false); toast.success('Medicamento adicionado'); },
     onError: (e: any) => toast.error(e.message),
   });
 
   const medUpdate = useMutation({
-    mutationFn: (id: string) => medicationApi.update(id, { name: medForm.name, dosage: medForm.dosage || undefined, frequency: medForm.frequency || undefined, notes: medForm.notes || undefined }),
+    mutationFn: (id: string) => medicationApi.update(id, { name: medForm.name, dosage: medForm.dosage || undefined, frequency: medForm.frequency || undefined, notes: medForm.notes || undefined, active: medForm.active, startedAt: medForm.startedAt || undefined, stoppedAt: medForm.stoppedAt || undefined }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['medications'] }); qc.invalidateQueries({ queryKey: ['health'] }); setMedOpen(false); toast.success('Medicamento atualizado'); },
     onError: (e: any) => toast.error(e.message),
   });
@@ -120,13 +121,13 @@ export default function Health() {
 
   const openMedCreate = () => {
     setEditingMedId(null);
-    setMedForm({ name: '', dosage: '', frequency: '', notes: '' });
+    setMedForm({ name: '', dosage: '', frequency: '', notes: '', active: true, startedAt: '', stoppedAt: '' });
     setMedOpen(true);
   };
 
   const openMedEdit = (m: MedicationListItemResponse) => {
     setEditingMedId(m.id);
-    setMedForm({ name: m.name, dosage: m.dosage || '', frequency: m.frequency || '', notes: m.notes || '' });
+    setMedForm({ name: m.name, dosage: m.dosage || '', frequency: m.frequency || '', notes: m.notes || '', active: m.active !== false, startedAt: m.startedAt || '', stoppedAt: m.stoppedAt || '' });
     setMedOpen(true);
   };
 
@@ -137,6 +138,10 @@ export default function Health() {
       medCreate.mutate();
     }
   };
+
+  // Delete confirmation dialogs
+  const [confirmDeleteAllergy, setConfirmDeleteAllergy] = useState<string | null>(null);
+  const [confirmDeleteMed, setConfirmDeleteMed] = useState<string | null>(null);
 
   const isAllergyPending = allergyCreate.isPending || allergyUpdate.isPending;
   const isMedPending = medCreate.isPending || medUpdate.isPending;
@@ -216,10 +221,13 @@ export default function Health() {
               <button
                 key={m.id}
                 onClick={() => openMedEdit(m)}
-                className="w-full text-left bg-card rounded-2xl p-4 card-shadow flex items-start gap-3 hover:bg-accent/50 transition-colors"
+                className={`w-full text-left bg-card rounded-2xl p-4 card-shadow flex items-start gap-3 hover:bg-accent/50 transition-colors ${m.active === false ? 'opacity-60' : ''}`}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium">{m.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{m.name}</p>
+                    {m.active === false && <Badge className="text-[10px] bg-muted text-muted-foreground">Descontinuado</Badge>}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {[m.dosage, m.frequency].filter(Boolean).join(' · ') || 'Sem detalhes'}
                   </p>
@@ -233,7 +241,7 @@ export default function Health() {
 
       {/* Health Edit Sheet */}
       <Sheet open={healthOpen} onOpenChange={setHealthOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto">
           <SheetHeader><SheetTitle>Informações de saúde</SheetTitle></SheetHeader>
           <form onSubmit={(e) => { e.preventDefault(); healthMut.mutate(); }} className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -256,7 +264,7 @@ export default function Health() {
 
       {/* Allergy Sheet (Create + Edit) */}
       <Sheet open={allergyOpen} onOpenChange={setAllergyOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto">
           <SheetHeader><SheetTitle>{editingAllergyId ? 'Editar alergia' : 'Nova alergia'}</SheetTitle></SheetHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleAllergySubmit(); }} className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -282,7 +290,7 @@ export default function Health() {
                   type="button"
                   variant="outline"
                   className="rounded-xl h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                  onClick={() => { allergyDelete.mutate(editingAllergyId); setAllergyOpen(false); }}
+                  onClick={() => setConfirmDeleteAllergy(editingAllergyId)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -297,7 +305,7 @@ export default function Health() {
 
       {/* Medication Sheet (Create + Edit) */}
       <Sheet open={medOpen} onOpenChange={setMedOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto">
           <SheetHeader><SheetTitle>{editingMedId ? 'Editar medicamento' : 'Novo medicamento'}</SheetTitle></SheetHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleMedSubmit(); }} className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -315,6 +323,26 @@ export default function Health() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={medForm.active ? 'active' : 'discontinued'} onValueChange={(v) => setMedForm(f => ({ ...f, active: v === 'active' }))}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Em uso (ativo)</SelectItem>
+                  <SelectItem value="discontinued">Descontinuado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Início</Label>
+                <Input type="date" value={medForm.startedAt} onChange={(e) => setMedForm(f => ({ ...f, startedAt: e.target.value }))} className="rounded-xl h-12" />
+              </div>
+              <div className="space-y-2">
+                <Label>Término</Label>
+                <Input type="date" value={medForm.stoppedAt} onChange={(e) => setMedForm(f => ({ ...f, stoppedAt: e.target.value }))} className="rounded-xl h-12" />
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label>Notas</Label>
               <Textarea value={medForm.notes} onChange={(e) => setMedForm(f => ({ ...f, notes: e.target.value }))} placeholder="Observações..." className="rounded-xl" />
             </div>
@@ -324,7 +352,7 @@ export default function Health() {
                   type="button"
                   variant="outline"
                   className="rounded-xl h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                  onClick={() => { medDelete.mutate(editingMedId); setMedOpen(false); }}
+                  onClick={() => setConfirmDeleteMed(editingMedId)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -336,6 +364,33 @@ export default function Health() {
           </form>
         </SheetContent>
       </Sheet>
+      {/* Confirm Delete Dialogs */}
+      <ConfirmDeleteDialog
+        open={!!confirmDeleteAllergy}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteAllergy(null); }}
+        title="Excluir alergia?"
+        description="A alergia será removida permanentemente dos seus registros."
+        onConfirm={() => {
+          if (confirmDeleteAllergy) {
+            allergyDelete.mutate(confirmDeleteAllergy);
+            setConfirmDeleteAllergy(null);
+            setAllergyOpen(false);
+          }
+        }}
+      />
+      <ConfirmDeleteDialog
+        open={!!confirmDeleteMed}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteMed(null); }}
+        title="Excluir medicamento?"
+        description="O medicamento será removido permanentemente dos seus registros."
+        onConfirm={() => {
+          if (confirmDeleteMed) {
+            medDelete.mutate(confirmDeleteMed);
+            setConfirmDeleteMed(null);
+            setMedOpen(false);
+          }
+        }}
+      />
     </motion.div>
   );
 }

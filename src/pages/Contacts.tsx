@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Phone, MapPin, Plus, Trash2, User, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog';
 
 const ADDRESS_LABELS: { value: AddressLabel; label: string }[] = [
   { value: 'HOME', label: 'Casa' },
@@ -146,6 +147,10 @@ export default function Contacts() {
     }
   };
 
+  // Delete confirmation dialogs
+  const [confirmDeleteContact, setConfirmDeleteContact] = useState<string | null>(null);
+  const [confirmDeleteAddress, setConfirmDeleteAddress] = useState<string | null>(null);
+
   const isContactPending = contactCreate.isPending || contactUpdate.isPending;
   const isAddressPending = addressCreate.isPending || addressUpdate.isPending;
 
@@ -230,7 +235,7 @@ export default function Contacts() {
 
       {/* Contact Sheet (Create + Edit) */}
       <Sheet open={contactOpen} onOpenChange={setContactOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[85vh] overflow-y-auto">
           <SheetHeader><SheetTitle>{editingContactId ? 'Editar contato' : 'Novo contato de emergência'}</SheetTitle></SheetHeader>
           <form onSubmit={(e) => { e.preventDefault(); handleContactSubmit(); }} className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -251,7 +256,7 @@ export default function Contacts() {
                   type="button"
                   variant="outline"
                   className="rounded-xl h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                  onClick={() => { contactDelete.mutate(editingContactId); setContactOpen(false); }}
+                  onClick={() => setConfirmDeleteContact(editingContactId)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -314,7 +319,7 @@ export default function Contacts() {
                   type="button"
                   variant="outline"
                   className="rounded-xl h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                  onClick={() => { addressDelete.mutate(editingAddressId); setAddressOpen(false); }}
+                  onClick={() => setConfirmDeleteAddress(editingAddressId)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -326,6 +331,33 @@ export default function Contacts() {
           </form>
         </SheetContent>
       </Sheet>
+      {/* Confirm Delete Dialogs */}
+      <ConfirmDeleteDialog
+        open={!!confirmDeleteContact}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteContact(null); }}
+        title="Excluir contato?"
+        description="O contato de emergência será removido permanentemente."
+        onConfirm={() => {
+          if (confirmDeleteContact) {
+            contactDelete.mutate(confirmDeleteContact);
+            setConfirmDeleteContact(null);
+            setContactOpen(false);
+          }
+        }}
+      />
+      <ConfirmDeleteDialog
+        open={!!confirmDeleteAddress}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteAddress(null); }}
+        title="Excluir endereço?"
+        description="O endereço será removido permanentemente."
+        onConfirm={() => {
+          if (confirmDeleteAddress) {
+            addressDelete.mutate(confirmDeleteAddress);
+            setConfirmDeleteAddress(null);
+            setAddressOpen(false);
+          }
+        }}
+      />
     </motion.div>
   );
 }
