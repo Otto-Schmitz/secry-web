@@ -12,6 +12,7 @@ import Health from "@/pages/Health";
 import Contacts from "@/pages/Contacts";
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/NotFound";
+import EmergencyPublic from "@/pages/EmergencyPublic";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/emergency/:token" element={<EmergencyPublic />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/health" element={<Health />} />

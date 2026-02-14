@@ -80,6 +80,9 @@ export interface MedicationListItemResponse {
   dosage: string;
   frequency: string;
   notes?: string;
+  active?: boolean;
+  startedAt?: string | null;
+  stoppedAt?: string | null;
 }
 
 export interface CreateMedicationRequest {
@@ -87,6 +90,9 @@ export interface CreateMedicationRequest {
   dosage?: string;
   frequency?: string;
   notes?: string;
+  active?: boolean;
+  startedAt?: string;
+  stoppedAt?: string;
 }
 
 export interface UpdateMedicationRequest {
@@ -94,6 +100,9 @@ export interface UpdateMedicationRequest {
   dosage?: string;
   frequency?: string;
   notes?: string;
+  active?: boolean;
+  startedAt?: string;
+  stoppedAt?: string;
 }
 
 // Emergency Contacts
@@ -154,6 +163,21 @@ export interface UpdateAddressRequest {
   state?: string;
   zip?: string;
   country?: string;
+}
+
+// Emergency Token
+export interface EmergencyTokenResponse {
+  token: string;
+  active: boolean;
+}
+
+export interface EmergencyPublicResponse {
+  name: string | null;
+  bloodType: string;
+  phone: string | null;
+  allergies: { name: string; severity: string }[];
+  emergencyContacts: { name: string; relationship: string; phone: string; priority: number }[];
+  medications: { name: string; dosage: string; frequency: string }[];
 }
 
 // Error
