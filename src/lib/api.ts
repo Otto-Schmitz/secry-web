@@ -11,6 +11,7 @@ import type {
   MedicationListItemResponse, CreateMedicationRequest, UpdateMedicationRequest,
   EmergencyContactResponse, CreateEmergencyContactRequest, UpdateEmergencyContactRequest,
   AddressResponse, CreateAddressRequest, UpdateAddressRequest,
+  EmergencyTokenResponse, EmergencyPublicResponse,
 } from '@/types/api';
 
 // Usar API real do backend (definir VITE_USE_MOCKS=true para mocks em dev)
@@ -28,7 +29,40 @@ function delay<T>(data: T, ms = 300): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(data), ms));
 }
 
-async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
+// Token refresh state to prevent concurrent refresh attempts
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return false;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!res.ok) return false;
+
+    const data: RefreshResponse = await res.json();
+    localStorage.setItem('accessToken', data.accessToken);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearAuthAndRedirect() {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('userId');
+  window.location.href = '/login';
+}
+
+async function apiClient<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
   const token = localStorage.getItem('accessToken');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -40,11 +74,29 @@ async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T>
 
   if (res.status === 204) return undefined as T;
 
-  if (res.status === 401) {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userId');
-    window.location.href = '/login';
+  if (res.status === 401 && !_isRetry) {
+    // Attempt token refresh (deduplicate concurrent requests)
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = tryRefreshToken().finally(() => {
+        isRefreshing = false;
+        refreshPromise = null;
+      });
+    }
+
+    const refreshed = await refreshPromise;
+    if (refreshed) {
+      // Retry the original request with new token
+      return apiClient<T>(path, options, true);
+    }
+
+    // Refresh failed — clear and redirect
+    clearAuthAndRedirect();
+    throw new Error('Sessão expirada');
+  }
+
+  if (res.status === 401 && _isRetry) {
+    clearAuthAndRedirect();
     throw new Error('Sessão expirada');
   }
 
@@ -163,5 +215,42 @@ export const addressApi = {
   delete: (id: string) => {
     if (USE_MOCKS) { mockAddresses = mockAddresses.filter(a => a.id !== id); return delay(undefined as void); }
     return apiClient<void>(`/me/addresses/${id}`, { method: 'DELETE' });
+  },
+};
+
+// Export
+export const exportApi = {
+  getAll: () =>
+    USE_MOCKS ? delay({ profile: mockProfile, health: mockHealth, allergies: mockAllergies, medications: mockMedications, emergencyContacts: mockContacts, addresses: mockAddresses, exportedAt: new Date().toISOString() }) : apiClient<any>('/me/export'),
+};
+
+// Emergency Token (authenticated)
+export const emergencyTokenApi = {
+  get: () =>
+    USE_MOCKS ? delay({ token: 'mock-emergency-token-abc123', active: true } as EmergencyTokenResponse) : apiClient<EmergencyTokenResponse>('/me/emergency-token'),
+  regenerate: () =>
+    USE_MOCKS ? delay({ token: `mock-${Date.now()}`, active: true } as EmergencyTokenResponse) : apiClient<EmergencyTokenResponse>('/me/emergency-token/regenerate', { method: 'POST' }),
+};
+
+// Emergency Public (no auth required)
+export const emergencyPublicApi = {
+  get: (token: string) => {
+    if (USE_MOCKS) {
+      return delay({
+        name: 'Lucas Oliveira', bloodType: 'O+', phone: '(11) 98765-4321',
+        allergies: [{ name: 'Amendoim', severity: 'HIGH' }, { name: 'Dipirona', severity: 'MEDIUM' }],
+        medications: [{ name: 'Losartana', dosage: '50mg', frequency: '1x ao dia' }],
+        emergencyContacts: [{ name: 'Ana Oliveira', relationship: 'Cônjuge', phone: '(11) 91234-5678', priority: 1 }],
+      } as EmergencyPublicResponse);
+    }
+    // Public endpoint — no auth header needed
+    return fetch(`${API_BASE_URL}/emergency/${token}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({ message: 'Token inválido' }));
+          throw new Error(error.message || 'Erro ao carregar dados de emergência');
+        }
+        return res.json() as Promise<EmergencyPublicResponse>;
+      });
   },
 };

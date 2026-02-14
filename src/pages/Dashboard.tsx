@@ -3,6 +3,7 @@ import { profileApi, healthApi, emergencyContactApi, addressApi } from '@/lib/ap
 import { Link } from 'react-router-dom';
 import { HeartPulse, AlertTriangle, Pill, Phone, MapPin, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SummaryCardProps {
   icon: React.ElementType;
@@ -11,6 +12,20 @@ interface SummaryCardProps {
   to: string;
   colorClass: string;
   bgClass: string;
+}
+
+interface SummaryCardSkeletonProps {}
+
+function SummaryCardSkeleton(_: SummaryCardSkeletonProps) {
+  return (
+    <div className="bg-card rounded-2xl p-4 card-shadow space-y-3">
+      <Skeleton className="w-10 h-10 rounded-xl" />
+      <div className="space-y-1.5">
+        <Skeleton className="h-7 w-12" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+    </div>
+  );
 }
 
 function SummaryCard({ icon: Icon, label, value, to, colorClass, bgClass }: SummaryCardProps) {
@@ -49,12 +64,13 @@ function QuickLink({ icon: Icon, label, to }: QuickLinkProps) {
 }
 
 export default function Dashboard() {
-  const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: () => profileApi.get() });
-  const { data: health } = useQuery({ queryKey: ['health'], queryFn: () => healthApi.get() });
-  const { data: contacts } = useQuery({ queryKey: ['emergency-contacts'], queryFn: () => emergencyContactApi.list() });
+  const { data: profile, isLoading: profileLoading } = useQuery({ queryKey: ['profile'], queryFn: () => profileApi.get() });
+  const { data: health, isLoading: healthLoading } = useQuery({ queryKey: ['health'], queryFn: () => healthApi.get() });
+  const { data: contacts, isLoading: contactsLoading } = useQuery({ queryKey: ['emergency-contacts'], queryFn: () => emergencyContactApi.list() });
   const { data: addresses } = useQuery({ queryKey: ['addresses'], queryFn: () => addressApi.list() });
 
   const firstName = profile?.fullName?.split(' ')[0] || 'Usuário';
+  const isLoading = profileLoading || healthLoading || contactsLoading;
 
   return (
     <motion.div
@@ -64,43 +80,63 @@ export default function Dashboard() {
       className="space-y-6 pb-8"
     >
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight">Olá, {firstName}</h1>
-        <p className="text-muted-foreground text-sm">Seu resumo de saúde</p>
+        {profileLoading ? (
+          <>
+            <Skeleton className="h-8 w-48 mb-1" />
+            <Skeleton className="h-4 w-36" />
+          </>
+        ) : (
+          <>
+            <h1 className="text-[28px] font-bold tracking-tight">Olá, {firstName}</h1>
+            <p className="text-muted-foreground text-sm">Seu resumo de saúde</p>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <SummaryCard
-          icon={HeartPulse}
-          label="Tipo Sanguíneo"
-          value={health?.bloodType || '—'}
-          to="/health"
-          colorClass="text-health-blood"
-          bgClass="bg-health-blood/10"
-        />
-        <SummaryCard
-          icon={AlertTriangle}
-          label="Alergias"
-          value={String(health?.allergyCount ?? '—')}
-          to="/health"
-          colorClass="text-health-allergy"
-          bgClass="bg-health-allergy/10"
-        />
-        <SummaryCard
-          icon={Pill}
-          label="Medicamentos"
-          value={String(health?.medicationCount ?? '—')}
-          to="/health"
-          colorClass="text-health-medication"
-          bgClass="bg-health-medication/10"
-        />
-        <SummaryCard
-          icon={Phone}
-          label="Emergência"
-          value={String(contacts?.length ?? '—')}
-          to="/contacts"
-          colorClass="text-health-contact"
-          bgClass="bg-health-contact/10"
-        />
+        {isLoading ? (
+          <>
+            <SummaryCardSkeleton />
+            <SummaryCardSkeleton />
+            <SummaryCardSkeleton />
+            <SummaryCardSkeleton />
+          </>
+        ) : (
+          <>
+            <SummaryCard
+              icon={HeartPulse}
+              label="Tipo Sanguíneo"
+              value={health?.bloodType || '—'}
+              to="/health"
+              colorClass="text-health-blood"
+              bgClass="bg-health-blood/10"
+            />
+            <SummaryCard
+              icon={AlertTriangle}
+              label="Alergias"
+              value={String(health?.allergyCount ?? '—')}
+              to="/health"
+              colorClass="text-health-allergy"
+              bgClass="bg-health-allergy/10"
+            />
+            <SummaryCard
+              icon={Pill}
+              label="Medicamentos"
+              value={String(health?.medicationCount ?? '—')}
+              to="/health"
+              colorClass="text-health-medication"
+              bgClass="bg-health-medication/10"
+            />
+            <SummaryCard
+              icon={Phone}
+              label="Emergência"
+              value={String(contacts?.length ?? '—')}
+              to="/contacts"
+              colorClass="text-health-contact"
+              bgClass="bg-health-contact/10"
+            />
+          </>
+        )}
       </div>
 
       <div className="space-y-2">
