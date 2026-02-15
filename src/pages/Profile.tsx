@@ -9,6 +9,7 @@ import { LogOut, Save, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import EmergencyQRCode from '@/components/EmergencyQRCode';
+import { generateExportPdf } from '@/lib/exportPdf';
 
 export default function Profile() {
   const { logout } = useAuth();
@@ -51,16 +52,9 @@ export default function Profile() {
     setExporting(true);
     try {
       const data = await exportApi.getAll();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `eu-dados-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success('Dados exportados com sucesso');
+      const doc = generateExportPdf(data);
+      doc.save(`eu-dados-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('Dados exportados em PDF com sucesso');
     } catch (e: any) {
       toast.error(e.message || 'Erro ao exportar');
     } finally {
@@ -130,7 +124,7 @@ export default function Profile() {
         className="w-full rounded-xl h-12"
       >
         <Download className="h-4 w-4 mr-2" />
-        {exporting ? 'Exportando...' : 'Exportar meus dados (JSON)'}
+        {exporting ? 'Exportando...' : 'Exportar meus dados (PDF)'}
       </Button>
 
       <Button variant="ghost" onClick={handleLogout} className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl h-12">
